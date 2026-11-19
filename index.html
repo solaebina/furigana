@@ -1,0 +1,457 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Furigana Notes</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #faf9f7;
+    --paper: #ffffff;
+    --ink: #1f1f1f;
+    --muted: #8a8780;
+    --line: #ebe8e3;
+    --accent: #c2410c;
+    --accent-soft: #fdf0e8;
+    --hover: #f3f1ed;
+    --shadow: 0 8px 30px rgba(0,0,0,.08);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #161616; --paper: #1d1d1d; --ink: #ece9e4; --muted: #8d8a85;
+      --line: #2c2b29; --accent: #fb923c; --accent-soft: #2e2118; --hover: #262524;
+      --shadow: 0 8px 30px rgba(0,0,0,.5);
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #161616; --paper: #1d1d1d; --ink: #ece9e4; --muted: #8d8a85;
+    --line: #2c2b29; --accent: #fb923c; --accent-soft: #2e2118; --hover: #262524;
+    --shadow: 0 8px 30px rgba(0,0,0,.5);
+  }
+
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; }
+  body {
+    background: var(--bg); color: var(--ink);
+    font-family: "Noto Sans JP", system-ui, -apple-system, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  button { font: inherit; color: inherit; background: none; border: 0; cursor: pointer; }
+
+  .app { max-width: 760px; margin: 0 auto; padding: 0 16px; min-height: 100%; display: flex; flex-direction: column; }
+
+  header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 20px 0 14px; gap: 12px;
+  }
+  .brand { font-weight: 500; font-size: 15px; letter-spacing: .02em; color: var(--muted); }
+  .brand b { color: var(--ink); font-weight: 700; }
+  .actions { display: flex; align-items: center; gap: 6px; }
+
+  .toggle {
+    display: inline-flex; align-items: center; gap: 8px;
+    padding: 6px 10px 6px 12px; border-radius: 999px; font-size: 13px;
+    border: 1px solid var(--line); background: var(--paper);
+  }
+  .switch { width: 30px; height: 18px; border-radius: 999px; background: var(--line); position: relative; transition: background .2s; }
+  .switch::after {
+    content: ""; position: absolute; top: 2px; left: 2px; width: 14px; height: 14px;
+    border-radius: 50%; background: #fff; box-shadow: 0 1px 2px rgba(0,0,0,.2); transition: transform .2s;
+  }
+  .toggle[aria-pressed="true"] .switch { background: var(--accent); }
+  .toggle[aria-pressed="true"] .switch::after { transform: translateX(12px); }
+  .toggle.loading .switch { opacity: .5; }
+
+  .icon-btn {
+    display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; border-radius: 999px;
+    font-size: 13px; border: 1px solid var(--line); background: var(--paper);
+  }
+  .icon-btn:hover, .toggle:hover { background: var(--hover); }
+  .count { font-variant-numeric: tabular-nums; color: var(--muted); }
+
+  .sheet {
+    flex: 1; background: var(--paper); border: 1px solid var(--line); border-radius: 14px;
+    margin-bottom: 16px; position: relative; min-height: 60vh; display: flex;
+  }
+  textarea, .reader {
+    width: 100%; flex: 1; padding: 28px 28px 40px; font-size: 18px; line-height: 2.2;
+    font-family: inherit; color: var(--ink); background: transparent;
+    white-space: pre-wrap; word-break: break-word;
+  }
+  textarea { border: 0; outline: none; resize: none; }
+  textarea::placeholder { color: var(--muted); }
+  .reader { display: none; cursor: default; overflow-wrap: anywhere; }
+  .furi-on textarea { display: none; }
+  .furi-on .reader { display: block; }
+
+  ruby { ruby-align: center; }
+  rt { font-size: .5em; color: var(--muted); letter-spacing: .02em; user-select: none; }
+  .k { cursor: pointer; border-radius: 3px; transition: background .12s; }
+  .k:hover { background: var(--accent-soft); color: var(--accent); }
+  .k.saved { text-decoration: underline; text-decoration-color: var(--accent); text-underline-offset: 6px; text-decoration-thickness: 2px; }
+  .k.active { background: var(--accent-soft); color: var(--accent); }
+
+  .hint { font-size: 12px; color: var(--muted); padding: 0 4px 20px; text-align: center; }
+
+  /* Definition card */
+  .card {
+    position: fixed; z-index: 20; width: min(340px, calc(100vw - 32px));
+    background: var(--paper); border: 1px solid var(--line); border-radius: 14px;
+    box-shadow: var(--shadow); padding: 18px; display: none;
+  }
+  .card.show { display: block; animation: pop .14s ease-out; }
+  @keyframes pop { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+  .card-top { display: flex; gap: 14px; align-items: flex-start; }
+  .glyph { font-size: 52px; line-height: 1; font-weight: 500; }
+  .card-main { flex: 1; min-width: 0; }
+  .meanings { font-size: 15px; font-weight: 500; margin: 2px 0 8px; }
+  .readings { font-size: 13px; color: var(--muted); line-height: 1.7; }
+  .readings span { color: var(--ink); }
+  .meta { font-size: 11px; color: var(--muted); margin-top: 10px; display: flex; gap: 10px; flex-wrap: wrap; }
+  .word { margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--line); font-size: 13px; }
+  .word-head { font-size: 16px; font-weight: 500; }
+  .word-head small { color: var(--muted); font-weight: 400; margin-left: 6px; font-size: 12px; }
+  .word ol { margin: 6px 0 0; padding-left: 18px; color: var(--ink); line-height: 1.6; }
+  .card-actions { display: flex; justify-content: space-between; align-items: center; margin-top: 14px; }
+  .save-btn {
+    padding: 7px 14px; border-radius: 999px; font-size: 13px; font-weight: 500;
+    background: var(--accent); color: #fff;
+  }
+  .save-btn.is-saved { background: var(--accent-soft); color: var(--accent); }
+  .close { font-size: 13px; color: var(--muted); padding: 6px; }
+  .muted { color: var(--muted); font-size: 13px; }
+
+  /* Saved drawer */
+  .scrim { position: fixed; inset: 0; background: rgba(0,0,0,.18); z-index: 30; display: none; }
+  .drawer {
+    position: fixed; top: 0; right: 0; bottom: 0; width: min(360px, 100vw); z-index: 31;
+    background: var(--paper); border-left: 1px solid var(--line); box-shadow: var(--shadow);
+    transform: translateX(100%); transition: transform .22s ease; display: flex; flex-direction: column;
+  }
+  .drawer-open .drawer { transform: none; }
+  .drawer-open .scrim { display: block; }
+  .drawer header { padding: 20px 20px 12px; border-bottom: 1px solid var(--line); }
+  .drawer h2 { font-size: 15px; margin: 0; font-weight: 700; }
+  .list { overflow-y: auto; flex: 1; padding: 8px; }
+  .item {
+    display: flex; align-items: center; gap: 14px; padding: 10px 12px; border-radius: 10px; cursor: pointer;
+  }
+  .item:hover { background: var(--hover); }
+  .item .g { font-size: 28px; font-weight: 500; width: 36px; text-align: center; }
+  .item .t { flex: 1; min-width: 0; }
+  .item .m { font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .item .r { font-size: 12px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .item .x { color: var(--muted); padding: 4px 8px; border-radius: 6px; opacity: 0; }
+  .item:hover .x { opacity: 1; }
+  .item .x:hover { background: var(--line); color: var(--ink); }
+  .empty { text-align: center; color: var(--muted); font-size: 13px; padding: 48px 20px; line-height: 1.8; }
+
+  @media (max-width: 520px) {
+    textarea, .reader { padding: 20px 18px 32px; font-size: 17px; }
+    .brand span { display: none; }
+    .item .x { opacity: 1; }
+  }
+</style>
+</head>
+<body>
+<div class="app" id="app">
+  <header>
+    <div class="brand"><b>ふりがな</b><span> · notes</span></div>
+    <div class="actions">
+      <button class="toggle" id="furiBtn" aria-pressed="false" title="Toggle furigana (⌘/Ctrl + Shift + F)">
+        <span id="furiLabel">ふりがな</span><span class="switch"></span>
+      </button>
+      <button class="icon-btn" id="savedBtn" title="Saved kanji">★ <span class="count" id="count">0</span></button>
+    </div>
+  </header>
+
+  <div class="sheet">
+    <textarea id="editor" spellcheck="false" placeholder="ここに日本語を書いてください…&#10;&#10;Type or paste Japanese text. Click any kanji to look it up."></textarea>
+    <div class="reader" id="reader"></div>
+  </div>
+  <div class="hint">Click a kanji for its meaning · ★ to save it</div>
+</div>
+
+<div class="card" id="card" role="dialog" aria-label="Kanji definition"></div>
+
+<div class="scrim" id="scrim"></div>
+<aside class="drawer" id="drawer" aria-label="Saved kanji">
+  <header>
+    <h2>Saved kanji</h2>
+    <button class="close" id="drawerClose">Close</button>
+  </header>
+  <div class="list" id="list"></div>
+</aside>
+
+<script src="https://cdn.jsdelivr.net/npm/kuromoji@0.1.2/build/kuromoji.js"></script>
+<script>
+(() => {
+  const $ = id => document.getElementById(id);
+  const editor = $('editor'), reader = $('reader'), card = $('card');
+  const furiBtn = $('furiBtn'), furiLabel = $('furiLabel');
+
+  // ---------- storage (safe) ----------
+  const store = {
+    get(k, d) { try { const v = localStorage.getItem(k); return v == null ? d : JSON.parse(v); } catch { return d; } },
+    set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} }
+  };
+  let saved = store.get('fn.saved', []);          // [{kanji, meanings, on, kun, word, at}]
+  editor.value = store.get('fn.text', '今日は新しい漢字を勉強しました。\n日本語の文章を書くと、ふりがなが自動で付きます。');
+  let saveTimer;
+  editor.addEventListener('input', () => {
+    clearTimeout(saveTimer);
+    saveTimer = setTimeout(() => store.set('fn.text', editor.value), 300);
+  });
+
+  // ---------- helpers ----------
+  const KANJI = /[㐀-䶿一-鿿豈-﫿]/;
+  const KANJI_RUN = /[㐀-䶿一-鿿豈-﫿々〆ヶ]/;
+  const esc = s => s.replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  const toHira = s => s.replace(/[ァ-ヶ]/g, c => String.fromCharCode(c.charCodeAt(0) - 0x60));
+  const isSaved = k => saved.some(s => s.kanji === k);
+
+  // ---------- tokenizer ----------
+  let tokenizer = null, tokenizerPromise = null;
+  function loadTokenizer() {
+    if (tokenizerPromise) return tokenizerPromise;
+    tokenizerPromise = new Promise((resolve, reject) => {
+      kuromoji.builder({ dicPath: 'https://cdn.jsdelivr.net/npm/kuromoji@0.1.2/dict/' })
+        .build((err, t) => err ? reject(err) : resolve(tokenizer = t));
+    });
+    return tokenizerPromise;
+  }
+
+  // Split a token into [{text, ruby?}] so okurigana isn't covered by furigana.
+  function segment(surface, reading) {
+    if (!KANJI_RUN.test(surface) || !reading) return [{ text: surface }];
+    const parts = surface.match(/[㐀-䶿一-鿿豈-﫿々〆ヶ]+|[^㐀-䶿一-鿿豈-﫿々〆ヶ]+/g);
+    const pattern = '^' + parts.map(p => KANJI_RUN.test(p) ? '(.+?)' : toHira(p).replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('') + '$';
+    const m = reading.match(new RegExp(pattern));
+    if (!m) return [{ text: surface, ruby: reading }];
+    let g = 1;
+    return parts.map(p => KANJI_RUN.test(p) ? { text: p, ruby: m[g++] } : { text: p });
+  }
+
+  let words = []; // index -> {surface, base, reading}
+  function render() {
+    words = [];
+    const html = editor.value.split('\n').map(line => {
+      if (!line) return '';
+      return tokenizer.tokenize(line).map(tok => {
+        const surface = tok.surface_form;
+        if (!KANJI_RUN.test(surface)) return esc(surface);
+        const reading = tok.reading && tok.reading !== '*' ? toHira(tok.reading) : '';
+        const idx = words.push({
+          surface, reading,
+          base: tok.basic_form && tok.basic_form !== '*' ? tok.basic_form : surface
+        }) - 1;
+        return segment(surface, reading).map(seg => {
+          const chars = [...seg.text].map(ch =>
+            KANJI.test(ch) ? `<span class="k${isSaved(ch) ? ' saved' : ''}" data-k="${ch}" data-w="${idx}">${ch}</span>` : esc(ch)
+          ).join('');
+          return seg.ruby && seg.ruby !== toHira(seg.text) ? `<ruby>${chars}<rt>${esc(seg.ruby)}</rt></ruby>` : chars;
+        }).join('');
+      }).join('');
+    }).join('\n');
+    reader.innerHTML = html || '<span class="muted">Nothing to show yet — switch off ふりがな to write.</span>';
+  }
+
+  async function setFurigana(on) {
+    if (on && !tokenizer) {
+      furiBtn.classList.add('loading'); furiLabel.textContent = '読み込み中…';
+      try { await loadTokenizer(); }
+      catch (e) { furiLabel.textContent = 'ふりがな'; furiBtn.classList.remove('loading'); alert('Could not load the dictionary. Check your internet connection.'); return; }
+      furiBtn.classList.remove('loading'); furiLabel.textContent = 'ふりがな';
+    }
+    furiBtn.setAttribute('aria-pressed', on);
+    $('app').classList.toggle('furi-on', on);
+    store.set('fn.furi', on);
+    hideCard();
+    if (on) render(); else editor.focus();
+  }
+  furiBtn.addEventListener('click', () => setFurigana(furiBtn.getAttribute('aria-pressed') !== 'true'));
+  document.addEventListener('keydown', e => {
+    if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key.toLowerCase() === 'f') { e.preventDefault(); furiBtn.click(); }
+    if (e.key === 'Escape') { hideCard(); closeDrawer(); }
+  });
+  // Preload dictionary quietly so the first toggle is fast.
+  setTimeout(() => loadTokenizer().catch(() => {}), 500);
+  if (store.get('fn.furi', false)) setFurigana(true);
+
+  // ---------- dictionary lookups (kanjiapi.dev, cached) ----------
+  const kanjiCache = new Map(), wordsCache = new Map();
+  const getJSON = url => fetch(url).then(r => r.ok ? r.json() : null).catch(() => null);
+  const getKanji = k => kanjiCache.get(k) || kanjiCache.set(k, getJSON('https://kanjiapi.dev/v1/kanji/' + encodeURIComponent(k))).get(k);
+  const getWords = k => wordsCache.get(k) || wordsCache.set(k, getJSON('https://kanjiapi.dev/v1/words/' + encodeURIComponent(k))).get(k);
+
+  async function findWord(kanji, w) {
+    if (!w || [...w.base].length < 2 && w.base === kanji) return null;
+    const list = await getWords(kanji);
+    if (!list) return null;
+    const pick = form => list.find(e => e.variants.some(v => v.written === form));
+    const hit = pick(w.base) || pick(w.surface);
+    if (!hit) return null;
+    const v = hit.variants.find(v => v.written === w.base || v.written === w.surface);
+    return { written: v.written, reading: v.pronounced, glosses: hit.meanings.slice(0, 3).map(m => m.glosses.join(', ')) };
+  }
+
+  // ---------- definition card ----------
+  let current = null, activeEl = null;
+  function place(rect) {
+    const w = card.offsetWidth, h = card.offsetHeight, m = 12;
+    let left = Math.min(Math.max(16, rect.left + rect.width / 2 - w / 2), innerWidth - w - 16);
+    let top = rect.bottom + m;
+    if (top + h > innerHeight - 16) top = Math.max(16, rect.top - h - m);
+    card.style.left = left + 'px'; card.style.top = top + 'px';
+  }
+
+  async function showCard(kanji, w, rect, token = {}) {
+    current = { kanji, w };
+    card.innerHTML = `<div class="card-top"><div class="glyph">${kanji}</div><div class="card-main"><div class="muted">Looking up…</div></div></div>`;
+    card.classList.add('show'); place(rect);
+    const myReq = current;
+    const [info, word] = await Promise.all([getKanji(kanji), findWord(kanji, w)]);
+    if (current !== myReq) return;
+    if (!info) {
+      card.querySelector('.card-main').innerHTML = '<div class="muted">No entry found (are you offline?).</div>';
+      return;
+    }
+    current.info = info; current.word = word;
+    const savedNow = isSaved(kanji);
+    card.innerHTML = `
+      <div class="card-top">
+        <div class="glyph">${kanji}</div>
+        <div class="card-main">
+          <div class="meanings">${esc(info.meanings.slice(0, 5).join(', ') || '—')}</div>
+          <div class="readings">
+            ${info.on_readings.length ? `音 <span>${esc(info.on_readings.join('、'))}</span><br>` : ''}
+            ${info.kun_readings.length ? `訓 <span>${esc(info.kun_readings.join('、'))}</span>` : ''}
+          </div>
+        </div>
+      </div>
+      <div class="meta">
+        ${info.jlpt ? `<span>JLPT N${info.jlpt}</span>` : ''}
+        ${info.grade ? `<span>Grade ${info.grade}</span>` : ''}
+        ${info.stroke_count ? `<span>${info.stroke_count} strokes</span>` : ''}
+      </div>
+      ${word ? `<div class="word"><div class="word-head">${esc(word.written)}<small>${esc(word.reading)}</small></div>
+        <ol>${word.glosses.map(g => `<li>${esc(g)}</li>`).join('')}</ol></div>` : ''}
+      <div class="card-actions">
+        <button class="save-btn ${savedNow ? 'is-saved' : ''}" id="saveBtn">${savedNow ? '★ Saved' : '☆ Save kanji'}</button>
+        <button class="close" id="cardClose">Close</button>
+      </div>`;
+    place(rect);
+    $('saveBtn').onclick = toggleSave;
+    $('cardClose').onclick = hideCard;
+  }
+  function hideCard() {
+    card.classList.remove('show'); current = null;
+    if (activeEl) activeEl.classList.remove('active'), activeEl = null;
+  }
+
+  // Reader: exact click on a kanji
+  reader.addEventListener('click', e => {
+    const el = e.target.closest('.k');
+    if (!el) return hideCard();
+    e.stopPropagation();
+    if (activeEl) activeEl.classList.remove('active');
+    activeEl = el; el.classList.add('active');
+    showCard(el.dataset.k, words[+el.dataset.w], el.getBoundingClientRect());
+  });
+
+  // Editor: look up the kanji next to the caret (or the selected kanji)
+  editor.addEventListener('click', e => {
+    const s = editor.selectionStart, end = editor.selectionEnd, t = editor.value;
+    let ch = null;
+    if (end - s === 1 && KANJI.test(t[s])) ch = t[s];
+    else if (s === end) ch = KANJI.test(t[s]) ? t[s] : KANJI.test(t[s - 1]) ? t[s - 1] : null;
+    if (!ch) return hideCard();
+    const pos = t[s] === ch ? s : s - 1;
+    let w = null;
+    if (tokenizer) {
+      // find the word containing this character
+      const lineStart = t.lastIndexOf('\n', pos - 1) + 1, lineEnd = (t.indexOf('\n', pos) + 1 || t.length + 1) - 1;
+      let off = lineStart;
+      for (const tok of tokenizer.tokenize(t.slice(lineStart, lineEnd))) {
+        const len = tok.surface_form.length;
+        if (pos >= off && pos < off + len) {
+          w = { surface: tok.surface_form, base: tok.basic_form !== '*' ? tok.basic_form : tok.surface_form };
+          break;
+        }
+        off += len;
+      }
+    }
+    showCard(ch, w, { left: e.clientX - 1, right: e.clientX + 1, width: 2, top: e.clientY - 14, bottom: e.clientY + 14 });
+  });
+
+  document.addEventListener('click', e => {
+    if (!card.contains(e.target) && !e.target.closest('.k') && e.target !== editor) hideCard();
+  });
+  addEventListener('resize', hideCard);
+
+  // ---------- saved kanji ----------
+  function persist() {
+    store.set('fn.saved', saved);
+    $('count').textContent = saved.length;
+    if ($('app').classList.contains('furi-on')) {
+      reader.querySelectorAll('.k').forEach(el => el.classList.toggle('saved', isSaved(el.dataset.k)));
+    }
+    renderList();
+  }
+  function toggleSave() {
+    if (!current || !current.info) return;
+    const k = current.kanji;
+    if (isSaved(k)) saved = saved.filter(s => s.kanji !== k);
+    else saved.unshift({
+      kanji: k,
+      meanings: current.info.meanings.slice(0, 4),
+      on: current.info.on_readings.slice(0, 3),
+      kun: current.info.kun_readings.slice(0, 3),
+      word: current.word ? `${current.word.written}（${current.word.reading}）` : '',
+      at: Date.now()
+    });
+    persist();
+    const b = $('saveBtn'), on = isSaved(k);
+    b.classList.toggle('is-saved', on); b.textContent = on ? '★ Saved' : '☆ Save kanji';
+  }
+  function renderList() {
+    const list = $('list');
+    if (!saved.length) {
+      list.innerHTML = '<div class="empty">No saved kanji yet.<br>Click a kanji in your notes and press ☆ Save.</div>';
+      return;
+    }
+    list.innerHTML = saved.map((s, i) => `
+      <div class="item" data-i="${i}">
+        <div class="g">${s.kanji}</div>
+        <div class="t">
+          <div class="m">${esc(s.meanings.join(', '))}</div>
+          <div class="r">${esc([...s.on, ...s.kun].join('・'))}${s.word ? ' — ' + esc(s.word) : ''}</div>
+        </div>
+        <button class="x" data-del="${i}" title="Remove">✕</button>
+      </div>`).join('');
+  }
+  $('list').addEventListener('click', e => {
+    const del = e.target.closest('[data-del]');
+    if (del) { saved.splice(+del.dataset.del, 1); persist(); return; }
+    const item = e.target.closest('.item');
+    if (item) {
+      const s = saved[+item.dataset.i];
+      closeDrawer();
+      const r = { left: innerWidth / 2, right: innerWidth / 2, width: 0, top: innerHeight / 3, bottom: innerHeight / 3 };
+      setTimeout(() => showCard(s.kanji, null, r), 0);
+    }
+  });
+  const openDrawer = () => { hideCard(); renderList(); document.body.classList.add('drawer-open'); };
+  const closeDrawer = () => document.body.classList.remove('drawer-open');
+  $('savedBtn').addEventListener('click', openDrawer);
+  $('drawerClose').addEventListener('click', closeDrawer);
+  $('scrim').addEventListener('click', closeDrawer);
+
+  persist();
+})();
+</script>
+</body>
+</html>
